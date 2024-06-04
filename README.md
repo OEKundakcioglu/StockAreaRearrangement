@@ -94,8 +94,7 @@ We provide tables to summarize the results and comparison of the models:
 
 You can view the performance of the trained DQN models through the following animation videos:
 
-- [Animation 1](path_to_animation1.mp4) //will be added soon
-- [Animation 2](path_to_animation2.mp4) //will be added soon
+- [DQN Animation](DQN Animation.mov)
 
 ## Contributor
 
