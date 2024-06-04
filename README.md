@@ -75,7 +75,7 @@ We provide tables to summarize the results and comparison of the models:
 | Model 14 | 188 | 12846 | 68.33 |
 | Model 15 | 61 | 3332 | 54.62 |
 
-**Performance Comparison:**
+**Performance Comparison When Models Used Together:**
 
 | Model | Time Taken for 1000 Episodes | Average Reward for 1000 Episodes | Negative Reward Finish Count for 1000 Episodes | Negative Reward Finish Percentage for 1000 Episodes |
 |-------|------------------------------|----------------------------------|-----------------------------------------------|---------------------------------------------------|
@@ -94,8 +94,8 @@ We provide tables to summarize the results and comparison of the models:
 
 You can view the performance of the trained DQN models through the following animation videos:
 
-- [Animation 1](path_to_animation1.mp4)
-- [Animation 2](path_to_animation2.mp4)
+- [Animation 1](path_to_animation1.mp4) //will be added soon
+- [Animation 2](path_to_animation2.mp4) //will be added soon
 
 ## Contributor
 
@@ -108,6 +108,3 @@ This project is licensed under the MIT License.
 ## Acknowledgments
 
 We would like to thank Borçelik for their support and the opportunity to apply our research in a practical setting.
-
----
-```
