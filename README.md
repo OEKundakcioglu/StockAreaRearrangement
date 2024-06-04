@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-This project is the preliminary preparation for our research on Deep Q-Learning (DQN) algorithms. Our objective is to optimize coil (bobbin) stacking in Borçelik's warehouse using a Deep Q-Learning approach. We aim to develop a system that can rearrange coils with minimal movements and compare it with a Mixed-Integer Programming (MIP) model.
+This project is the preliminary preparation for our research on Deep Q-Learning (DQN) algorithms. Our objective is to optimize stock area rearrangement problem using a Deep Q-Learning approach and other mmothods. We aim to develop a system that can rearrange coils with minimal movements and compare it with a Mixed-Integer Programming (MIP) model.
 
 ## Repository Structure
 
