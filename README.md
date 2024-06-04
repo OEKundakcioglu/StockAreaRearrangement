@@ -98,7 +98,7 @@ You can view the performance of the trained DQN models through the following ani
 
 ## Contributor
 
-- [Egecan Aktan](egecan.aktan@ozu.edu.tr)
+- [Egecan Aktan](https://github.com/Egecan33)
 
 ## License
 
