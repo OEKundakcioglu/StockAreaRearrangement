@@ -1,0 +1,384 @@
+import time
+import numpy as np
+from tensorflow.keras.models import load_model
+from tensorflow.keras.models import load_model
+from tensorflow.keras.losses import MeanSquaredError
+from Env_wnr import CustomEnv, render
+import Env as Env
+from mpl_toolkits.mplot3d import Axes3D
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+import tensorflow as tf
+
+
+print("Num GPUs Available: ", len(tf.config.list_physical_devices("GPU")))
+
+
+def preprocess_state_with_priority(state, remaining_moves, moves=3):
+    processed_state = []
+    for position_key in sorted(state.keys()):
+        bobbin = state[position_key]
+        if bobbin is None:
+            processed_state.extend([0, 0, 0, 0, 0, 0])
+        else:
+            priority_encoding = [0, 0, 0, 0, 0]
+            priority_encoding[bobbin.priority - 1] = 1
+            is_blocked_o = 1 if bobbin.is_blocked_o else 0
+            processed_state.extend(priority_encoding + [is_blocked_o])
+    moves_normalized = (remaining_moves - 1) / (
+        moves - 1
+    )  # Normalizing based on max moves
+    processed_state.append(moves_normalized)
+    return np.array(processed_state).reshape(1, -1)
+
+
+# Function to determine the color based on the priority
+def set_priority_color(priority, is_blocked=False):
+    if is_blocked:
+        return "black"  # Blocked coils are black
+    color_mapping = {5: "darkred", 4: "red", 3: "orange", 2: "yellow", 1: "green"}
+    return color_mapping.get(priority, "black")  # Default color if not found
+
+
+# Function to draw cylinders with priority-based coloring
+def draw_cylinder_outline(
+    ax1, x, y, z, dx=1, dy=1, dz=1, priority=None, is_blocked=False
+):
+
+    # Set the color based on the priority if provided
+    color = set_priority_color(priority, is_blocked) if priority else "b"
+
+    # Cylinder parameters
+    r = 0.5  # Radius of the cylinder
+    theta = np.linspace(0, 2 * np.pi, 30)
+
+    # Create grid for the sides
+    y_line = np.linspace(y, y + dy, 2)  # for length alignment
+    theta, y_line = np.meshgrid(theta, y_line)
+
+    # Cylinder sides
+    x_sides = r * np.cos(theta) + x
+    z_sides = r * np.sin(theta) + z
+    y_sides = y_line
+
+    # Draw the surface of the cylinder
+    ax1.plot_surface(x_sides, y_sides, z_sides, color=color, alpha=0.6)
+
+    # Cylinder ends
+    x_circle = r * np.cos(theta[0]) + x
+    z_circle = r * np.sin(theta[0]) + z
+    y_ends = np.array([y, y + dy])
+
+    # Draw the ends of the cylinder
+    for y_end in y_ends:
+        x_end = r * np.cos(theta[0]) + x
+        z_end = r * np.sin(theta[0]) + z
+        ax1.add_collection3d(
+            Poly3DCollection(
+                [list(zip(x_end, np.full_like(x_end, y_end), z_end))],
+                color=color,
+                alpha=0.6,
+            )
+        )
+
+    # Draw the top surface (rectangle)
+    for i in range(len(theta[0]) - 1):
+        x_rect = [x_sides[0, i], x_sides[0, i + 1], x_sides[1, i + 1], x_sides[1, i]]
+        z_rect = [z_sides[0, i], z_sides[0, i + 1], z_sides[1, i + 1], z_sides[1, i]]
+        y_rect = [y_sides[0, i], y_sides[0, i + 1], y_sides[1, i + 1], y_sides[1, i]]
+        ax1.add_collection3d(
+            Poly3DCollection(
+                [list(zip(x_rect, y_rect, z_rect))], color=color, alpha=0.6
+            )
+        )
+
+
+def get_position_coordinates(position_key):
+    """Get the row and column coordinates from the position key."""
+    row, col = map(int, position_key.split("_")[1].split(","))
+    return int(row), int(col)
+
+
+def plot_staggered_outline_with_constraints(state, move):
+    fig = plt.figure(figsize=(8, 8))
+    ax1 = fig.add_subplot(111, projection="3d")
+    ax1.set_title(f"Move: {move}")
+    spacing = 1.2  # Adjust spacing for better visual separation
+
+    # Initialize layers to keep track of placed coils
+    first_layer = np.zeros((5, 5), dtype=bool)
+    second_layer = np.zeros((5, 4), dtype=bool)
+    third_layer = np.zeros((5, 3), dtype=bool)
+
+    # Adjustments for visual representation
+    layer_heights = [-1.5, 0, 1.5]  # Adjust z-coordinates for layer separation
+
+    for position_key in sorted(state.keys()):
+        if state[position_key] is not None:
+            priority = state[position_key].priority
+            is_blocked = state[position_key].is_blocked_o
+            row, col = get_position_coordinates(position_key)
+
+            row -= 1
+            col -= 1
+
+            if "1st" in position_key:
+                x = col * spacing
+                y = (4 - row) * spacing
+                z = layer_heights[0]
+                draw_cylinder_outline(
+                    ax1, x, y, -1.3, dx=1, priority=priority, is_blocked=is_blocked
+                )
+                first_layer[row, col] = True
+
+            elif "2nd" in position_key:
+                x = col * spacing + 0.6  # Staggering for second layer
+                y = (3 - row) * spacing + 1.2
+                z = layer_heights[1]
+                draw_cylinder_outline(
+                    ax1, x, y, -0.4, dx=1, priority=priority, is_blocked=is_blocked
+                )
+                second_layer[row, col] = True
+
+            elif "3rd" in position_key:
+                x = col * spacing + 1.2  # Further staggering for third layer
+                y = (2 - row) * spacing + 2.4
+                z = layer_heights[2]
+                draw_cylinder_outline(
+                    ax1, x, y, 0.5, dx=1, priority=priority, is_blocked=is_blocked
+                )
+                third_layer[row, col] = True
+
+    # Assuming your actual `set_axes_equal` function sets equal scaling
+    # The following just calculates the extents for demonstration
+    objects_extent = [
+        0,
+        5 * spacing + 1.2,
+        0,
+        5 * spacing,
+        layer_heights[0],
+        layer_heights[2],
+    ]
+    set_axes_equal(ax1, objects_extent)
+
+    ax1.set_xlabel("X")
+    ax1.set_ylabel("Y")
+    ax1.set_zlabel("Z")
+    ax1.view_init(elev=20, azim=-45)  # Adjust for a better viewing angle
+
+    plt.show()
+
+
+def set_axes_equal(ax, objects_extent):
+    # Expand the objects extent to maintain a cube-like aspect ratio
+    max_range = (
+        np.array(
+            [
+                objects_extent[1] - objects_extent[0],
+                objects_extent[3] - objects_extent[2],
+                objects_extent[5] - objects_extent[4],
+            ]
+        ).max()
+        / 2.0
+    )
+
+    mid_x = (objects_extent[1] + objects_extent[0]) * 0.5
+    mid_y = (objects_extent[3] + objects_extent[2]) * 0.5
+    mid_z = (objects_extent[5] + objects_extent[4]) * 0.5
+
+    ax.set_xlim(mid_x - max_range, mid_x + max_range)
+    ax.set_ylim(mid_y - max_range, mid_y + max_range)
+    ax.set_zlim(mid_z - max_range, mid_z + max_range)
+
+    # Set the same scale for all axes
+    ax.set_box_aspect([1, 1, 1])
+
+
+def solve_with_model(model, state_initial, env):
+    # Add your code here
+    remaining_moves = 3
+    state_count = 0
+    # ızels render*********************** forınıtıal state
+    env.state = state_initial.copy()
+    state = state_initial.copy()
+
+    states = {}
+
+    moves = {}
+
+    state = preprocess_state_with_priority(state, remaining_moves)
+
+    done = False
+    total_reward = 0
+
+    def get_valid_actions():
+        valid_actions = []
+        valid_actions.append(3720)  # Add action number 3720 for "do nothing"
+        for action in range(0, 3720):
+            from_key, to_key = env.action_to_key(action)
+
+            # Ensure both keys are valid before checking move validity
+            if from_key is None or to_key is None:
+                continue
+            if env.is_move_valid(from_key, to_key):
+                valid_actions.append(action)
+
+        return valid_actions
+
+    while not done:
+
+        # Predict the best action from the current state
+        q_values = model.predict(state)
+        valid_actions = get_valid_actions()
+        q_values_filtered = q_values[0][valid_actions]
+        action = valid_actions[np.argmax(q_values_filtered)]
+
+        if env.perfect_scenerio():
+            done = True
+            print("Perfect Scenerio")
+        render(env.state)
+        if done == False:
+            # Execute the chosen action
+            next_state, reward, done, _ = env.step(action, total_reward)
+
+            state_count += 1
+            remaining_moves -= 1
+
+            # f"state{statecount}" = nextstate
+            states[f"state_{state_count}"] = next_state.copy()
+            moves[f"move_{state_count}"] = env.action_to_key(action)
+
+            next_state = preprocess_state_with_priority(next_state, remaining_moves)
+
+            # Update state and total reward
+            state = next_state
+            total_reward += reward
+
+            # Render the environment (optional)
+
+    return states, moves, total_reward
+
+
+def model_use(env, state_initial, max_reward):
+
+    model_names = [
+        "model1.keras",
+        "model2.keras",
+        "model3.keras",
+        "model4.keras",
+        # "model5.keras",
+        # "model6.keras",
+        # "model7.keras",
+        # "model8.keras",
+        "model9.keras",
+        "model10.keras",
+        # "model11.keras",
+        "model12.keras",
+        "model13.keras",
+        "model14.keras",
+        "model15.keras",
+    ]
+    states = {}
+    moves = {}
+    best_states = {}
+    best_moves = {}
+
+    for model_name in model_names:
+        env.state = state_initial.copy()
+        env.total_movements = 0
+        states, moves, total_reward = solve_with_model(
+            load_model(model_name), state_initial.copy(), env
+        )
+        if total_reward > 200 and env.total_movements <= 1:
+            total_reward += 200
+        elif total_reward > 200 and env.total_movements <= 2:
+            total_reward += 100  # these aditional rewards are added to the total reward to prioritize minimizing moves when achiveing perfect scenerio
+
+        if total_reward > max_reward:
+
+            max_reward = total_reward
+            best_states = states
+            best_moves = moves
+
+    if max_reward >= 400:
+        max_reward -= 200
+    elif max_reward >= 300:
+        max_reward -= 100
+
+    return max_reward, best_states, best_moves
+
+
+def load_bobbins_from_file(filename):
+    state_initial = {}
+    with open(filename, "r") as file:
+        for line in file:
+            line = line.strip()
+            if line.endswith(":") or not line:
+                continue  # Skip section headers and empty lines
+            key, value = line.split(":")
+            key = key.strip()
+            value = value.strip()
+            if value == "None":
+                state_initial[key] = None
+            else:
+                priority, state = value.split(",")
+                priority = int(priority.strip())
+                state = state.strip() == "True"
+                state_initial[key] = Env.Bobbin(priority, state)
+    return state_initial
+
+
+def bobbin_entries():
+    bobbins = load_bobbins_from_file("bobbins_data.txt")
+    return bobbins
+
+
+def main():
+    t0 = time.time()
+
+    env = CustomEnv()
+    # Reset the environment and preprocess the initial state
+    state_initial = bobbin_entries()
+    max_reward = 0
+    # Load the trained model
+
+    best_states = {}
+    best_moves = {}
+
+    max_reward, best_states, best_moves = model_use(env, state_initial, max_reward)
+
+    if max_reward > 0:
+        # izels render for initial
+        # if not the same with init izels render for state 1 with f key with title move1
+        # .... until all moves are displayed
+        print("Time:", time.time() - t0)
+        plot_staggered_outline_with_constraints(state_initial, move="initial")
+
+        def process_moves(best_moves, best_states):
+            for i in range(1, len(best_moves) + 1):
+                try:
+                    move_key = f"move_{i}"
+                    state_key = f"state_{i}"
+                    if best_moves[move_key] is not None:
+                        print(best_states[state_key])
+                        print()
+                        print(best_moves[move_key])
+                        plot_staggered_outline_with_constraints(
+                            best_states[state_key], best_moves[move_key]
+                        )
+                except KeyError:
+                    print("last_state")
+                    pass
+
+        process_moves(best_moves, best_states)
+
+        print(max_reward)
+
+    else:
+        # izels render for initial position with title do nothing
+        plot_staggered_outline_with_constraints(state_initial, move="do nothing")
+        print("Do nothing!")
+
+
+if __name__ == "__main__":
+    main()
