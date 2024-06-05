@@ -60,7 +60,7 @@ Here is a summary of the training presets for these models:
 
 We provide tables to summarize the results and comparison of the models:
 
-**Individual Model Analysis:**
+**Performance Comparison When Models Used Together:**
 
 | Model | Episodes Completed as Best | Total Score When Best | Average Score When Best |
 |-------|-----------------------------|-----------------------|-------------------------|
@@ -75,7 +75,7 @@ We provide tables to summarize the results and comparison of the models:
 | Model 14 | 188 | 12846 | 68.33 |
 | Model 15 | 61 | 3332 | 54.62 |
 
-**Performance Comparison When Models Used Together:**
+**Individual Model Analysis:**
 
 | Model | Time Taken for 1000 Episodes | Average Reward for 1000 Episodes | Negative Reward Finish Count for 1000 Episodes | Negative Reward Finish Percentage for 1000 Episodes |
 |-------|------------------------------|----------------------------------|-----------------------------------------------|---------------------------------------------------|
